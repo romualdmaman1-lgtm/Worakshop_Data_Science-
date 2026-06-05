@@ -1,0 +1,187 @@
+---
+title: "Comparison Figures — Yogurt Study"
+format:
+  html:
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(ggpubr)
+library(here)
+
+# Read and join arm + time_point info
+sample_ids <- read_csv(here("data", "group_a_yogurt", "00_sample_ids_yogurt.csv"),
+                       show_col_types = FALSE)
+
+qpcr <- read_csv(here("data", "group_a_yogurt", "02_qpcr_results_yogurt.csv"),
+                 show_col_types = FALSE) |>
+  left_join(sample_ids |> select(sample_id, arm), by = "sample_id")
+
+luminex <- read_csv(here("data", "group_a_yogurt", "03_luminex_results_yogurt.csv"),
+                    show_col_types = FALSE) |>
+  left_join(sample_ids |> select(sample_id, arm), by = "sample_id")
+```
+
+## qPCR outcomes — faceted by outcome
+
+Three bacterial DNA measures, split by study arm. Each panel shows one outcome,
+and `stat_compare_means()` draws the Wilcoxon p-value on the plot.
+
+```{r}
+# Pivot longer so we can facet by outcome name
+qpcr_long <- qpcr |>
+  pivot_longer(
+    cols = c(qpcr_bacteria, qpcr_crispatus, qpcr_iners),
+    names_to = "outcome",
+    values_to = "value"
+  ) |>
+  # Clean up labels for the facet strips
+  mutate(outcome = case_when(
+    outcome == "qpcr_bacteria"  ~ "Total bacteria",
+    outcome == "qpcr_crispatus" ~ "L. crispatus",
+    outcome == "qpcr_iners"     ~ "L. iners"
+  ))
+```
+
+```{r}
+ggpubr::ggboxplot(
+  qpcr_long,
+  x = "arm",
+  y = "value",
+  color = "arm",
+  palette = c("#E69F00", "#0072B2"),
+  add = "jitter",
+  add.params = list(size = 1.5, alpha = 0.4)
+) +
+  facet_wrap(~ outcome, scales = "free_y") +
+  stat_compare_means(comparisons = list(c("unchanged_diet", "yogurt")),
+                     method = "wilcox.test",
+                     label = "p.format") +
+  labs(x = "Study Arm", y = "DNA copy count",
+       title = "qPCR outcomes by study arm") +
+  theme(legend.position = "none")
+```
+
+Looking at *L. crispatus* — notice how a few high-outlier samples stretch the
+y-axis. On the log scale, the pattern is clearer:
+
+```{r}
+ggpubr::ggboxplot(
+  qpcr_long |> mutate(value = value + 1),  # +1 so log(0) = log(1) = 0
+  x = "arm",
+  y = "value",
+  color = "arm",
+  palette = c("#E69F00", "#0072B2"),
+  add = "jitter",
+  add.params = list(size = 1.5, alpha = 0.4)
+) +
+  facet_wrap(~ outcome, scales = "free_y") +
+  scale_y_log10(labels = scales::label_number()) +
+  stat_compare_means(comparisons = list(c("unchanged_diet", "yogurt")),
+                     method = "wilcox.test",
+                     label = "p.format") +
+  labs(x = "Study Arm", y = "DNA copy count (log scale)",
+       title = "qPCR outcomes by study arm (log scale)") +
+  theme(legend.position = "none")
+```
+
+---
+
+## Cytokine immune markers — faceted by cytokine
+
+All 10 Luminex cytokines. **Caution:** several cytokines have most values flagged
+as "out of range" in the lab assay — those measurements may not be reliable.
+
+```{r}
+#| warning: true
+# Data note: IL-10 is constant (0.767, all "out of range") — won't plot.
+
+cytokines_valid <- c("IFN-Y", "TNFa", "IL-1a", "IL-1b", "IL-6", "IL-8", "IP-10", "MIG", "MIP-3a")
+
+luminex |>
+  filter(cytokine %in% cytokines_valid) |>
+  ggboxplot(
+    x = "arm",
+    y = "conc",
+    color = "arm",
+    palette = c("#E69F00", "#0072B2"),
+    add = "jitter",
+    add.params = list(size = 1, alpha = 0.3)
+  ) +
+  facet_wrap(~ cytokine, scales = "free_y", nrow = 3) +
+  stat_compare_means(comparisons = list(c("unchanged_diet", "yogurt")),
+                     method = "wilcox.test",
+                     label = "p.format",
+                     tip.length = 0.01) +
+  labs(x = "Study Arm", y = "Concentration",
+       title = "Cytokine concentrations by study arm",
+       caption = "Wilcoxon rank-sum p-values shown on each panel.") +
+  theme(legend.position = "none")
+```
+
+Since cytokine data is often right-skewed, the log scale is more informative:
+
+```{r}
+luminex |>
+  filter(cytokine %in% cytokines_valid, conc > 0) |>
+  ggboxplot(
+    x = "arm",
+    y = "conc",
+    color = "arm",
+    palette = c("#E69F00", "#0072B2"),
+    add = "jitter",
+    add.params = list(size = 1, alpha = 0.3)
+  ) +
+  facet_wrap(~ cytokine, scales = "free_y", nrow = 3) +
+  scale_y_log10(labels = scales::label_number()) +
+  stat_compare_means(comparisons = list(c("unchanged_diet", "yogurt")),
+                     method = "wilcox.test",
+                     label = "p.format",
+                     tip.length = 0.01) +
+  labs(x = "Study Arm", y = "Concentration (log scale)",
+       title = "Cytokine concentrations by study arm (log scale)",
+       caption = "Wilcoxon rank-sum p-values. Zero concentrations excluded for log transform.") +
+  theme(legend.position = "none")
+```
+
+---
+
+## Data quality note
+
+```{r}
+#| echo: false
+luminex |>
+  group_by(cytokine, limits) |>
+  summarise(n = n(), .groups = "drop") |>
+  pivot_wider(names_from = limits, values_from = n, values_fill = 0) |>
+  mutate(prop_unreliable = round(`out of range` / (`out of range` + `within limits`) * 100, 0)) |>
+  knitr::kable(caption = "Cytokine data quality: how many measurements are 'out of range'?")
+```
+
+The dotted line on the log-scale plots still includes these "out of range" values;
+be cautious with cytokines where >50% of data is flagged unreliable (IFN-Y, IL-10,
+TNFa).
+
+---
+
+## Code summary
+
+The pattern is always the same:
+
+```r
+library(ggpubr)
+
+ggboxplot(data, x = "arm", y = "outcome",
+          color = "arm", add = "jitter") +
+  facet_wrap(~ group_var, scales = "free_y") +
+  stat_compare_means(comparisons = list(c("group1", "group2")),
+                     method = "wilcox.test",
+                     label = "p.format")
+```
+
+- `ggboxplot()` — draws the boxplots with optional jittered points
+- `facet_wrap()` — splits into multiple panels, one per outcome
+- `stat_compare_means()` — adds the p-value; auto-chooses Wilcoxon for 2 groups
+  or Kruskal-Wallis for 3+, or you can set `method = "t.test"`

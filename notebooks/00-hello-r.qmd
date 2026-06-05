@@ -22,6 +22,43 @@ ggplot(penguins, aes(x = flipper_length_mm, y = body_mass_g, color = species)) +
   )
 ```
 
-Curious to make this your own? Open the terminal and ask Pi to help —
+```{r}
+library(tidyverse)
+sample_ids <- read_csv("data/group_a_yogurt/00_sample_ids_yogurt.csv")
+metadata <- read_csv("data/group_a_yogurt/01_participant_metadata_yogurt.csv")
+qpcr <- read_csv("data/group_a_yogurt/02_qpcr_results_yogurt.csv")
+luminex <- read_csv("data/group_a_yogurt/03_luminex_results_yogurt.csv")
+```
+```{r}
+glimpse(sample_ids)
+glimpse(metadata)
+glimpse(qpcr)
+glimpse(luminex)
+count(sample_ids, arm)
+count(sample_ids, time_point)
+count(luminex, cytokine)
+summary(metadata$age)
+qpcr_joined <- qpcr |>
+  left_join(sample_ids, by = "sample_id")
+
+glimpse(qpcr_joined)
+luminex_joined <- luminex |>
+  left_join(sample_ids, by = "sample_id")
+
+glimpse(luminex_joined)
+ggplot(qpcr_joined, aes(x = arm, y = qpcr_bacteria, fill = arm )) +
+  geom_boxplot() +
+  labs(title = "Total bacteria by study arm")
+ggplot(qpcr_joined, aes(x = arm, y = qpcr_crispatus, fill = arm )) +
+  geom_boxplot() +
+  labs(title = "L. crispatus DNA by study arm")
+luminex_joined |>
+  filter(cytokine == "IL-1a") |>
+  ggplot(aes(x = arm, y = conc, fill = arm )) +
+  geom_boxplot() +
+  labs(title = "IL-1a concentration by study arm")
+
+```
+is your own? Open the terminal and ask Pi to help —
 for example, "Can you change the plot to show bill length instead of flipper
 length?" Experimenting is the best way to learn.

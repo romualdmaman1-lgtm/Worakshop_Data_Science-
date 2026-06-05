@@ -19,18 +19,18 @@ table_02 <- read_csv(here("data/instructional_dataset/02_visit_clinical_measurem
 ## Part 1 — Read two plots (no code)
 
 ```{r}
-#| echo: false
-#| fig-width: 6
-#| fig-height: 4
+#echo: false
+#fig-width: 6
+#fig-height: 4
 ggplot(table_02, aes(x = ph, y = nugent_score, color = arm)) +
   geom_jitter()
 ```
 
 **Plot 1 (above). Answer in plain words:**
 
-1. What is the mark?
-2. What mark property comes from what column?
-3. How many rows of data made each mark?
+1. What is the mark? Mark is coloured dots
+2. What mark property comes from what column? mark come from ph and nugent_score
+3. How many rows of data made each mark? 132 rows,  
 
 ```{r}
 #| echo: false
@@ -40,38 +40,42 @@ ggplot(table_02, aes(x = arm, y = ph, fill = arm)) +
   geom_boxplot()
 ```
 
-**Plot 2 (above). Answer the same three questions.**
+**Plot 2 (above). Answer the same three questions.1- The marks is a box who summarises many rows
+2- The are arm and ph
+3- The 132 rows**
 
 **Sketch.** Draw on paper or describe in words a plot that answers "does pH differ between treatment arms?" Name the mark, the mappings, and how many rows make each mark.
 
-*Your sketch / description:*
+*Your sketch / description: yes, pH of treatment is higher than that of the arms; the mark is a box; the mappings ph-> y, arm-> x, arm-> color; 132 rows*
 
 ## Part 2 — Build the plot
 
 Each step adds one piece on top of the previous plot. Run after each.
 
 ```{r}
-# step 1: ggplot(table_02, aes(x = ph, y = nugent_score)) + geom_point()
+ggplot(table_02, aes(x = ph, y = nugent_score)) + geom_point()
 ```
 
 ```{r}
-# step 2: swap geom_point() for geom_jitter()
+ggplot(table_02, aes(x = ph, y = nugent_score)) + geom_jitter()
 ```
 
 ```{r}
-# step 3: add aes(color = arm)
+ggplot(table_02, aes(x = ph, y = nugent_score)) + geom_jitter() + aes(color = arm)
 ```
 
 ```{r}
-# step 4: switch to a boxplot of ph by arm: aes(x = arm, y = ph) + geom_boxplot()
+ggplot(table_02, aes(x = arm, y = ph)) +
+  geom_boxplot()
 ```
 
 ```{r}
-# step 5a: aes(fill = arm) — mapping
+ggplot(table_02, aes(x = arm, y = ph, fill = arm)) + geom_boxplot()
 ```
 
 ```{r}
-# step 5b: fill = "navyblue" outside aes() — parameter
+ggplot(table_02, aes(x = arm, y = ph, fill = navyblue)) + geom_boxplot()
+ggplot(table_02, aes(x = arm, y = ph, fill = arm)) + geom_boxplot()
 ```
 
 ```{r}

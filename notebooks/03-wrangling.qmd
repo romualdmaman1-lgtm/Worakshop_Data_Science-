@@ -26,48 +26,50 @@ table_02
 
 **1. How many rows? What does one row represent?**
 
-*Your answer:*
+*132 rows, 133 lines total, a rows is a single visit measurement*
 
 **2. After `table_02 |> filter(time_point == "baseline")`, how many rows? What does each row represent now?**
 
-*Your answer:*
+*44 rows, one per participant at the start. Each row now represents one participant's starting measurements (before they received placebo or        
+ treatment). Same columns (pid, time_point, arm, nugent_score, crp_blood, ph), but only the baseline visit for each person.*
 
 **3. After `table_02 |> count(arm)`, how many rows? What does each row represent now?**
 
-*Your answer:*
+*- 2 rows — one for each group.                                                                          
+ - Each row represents one study group and how many total visits they contributed.*
 
 ## Part 2 — Build the pipeline
 
 Each step adds one verb on top of the previous pipeline. Run after each step.
 
 ```{r}
-# step 1: pipe table_02 into head()
+head(table_02)
 ```
 
 ```{r}
-# step 2: filter to the baseline time point
+table_02 |> filter(time_point == "baseline")
 ```
 
 ```{r}
-# step 3: add select() for pid, arm, ph, nugent_score, crp_blood
+table_02 |> select(pid, arm, ph, nugent_score, crp_blood)
 ```
 
 ```{r}
-# step 4: add mutate() for high_ph = if_else(ph >= 4.5, "yes", "no")
+table_02 |> mutate(high_ph = if_else(ph >= 4.5, "yes", "no"))
 ```
 
 ```{r}
-# step 5: add arrange(desc(ph))
+table_02 |> arrange(desc(ph))
 ```
 
 ```{r}
 # step 6: assign the final pipeline to early_visit, then print it
-early_visit <- NULL  # replace NULL with the pipeline
+early_visit <- table_02
 early_visit
 ```
 
 ```{r}
-# step 7: separately, table_02 |> count(arm)
+table_02 |> count(arm) 
 ```
 
 ## Part 3 — Reach (optional)
@@ -81,5 +83,11 @@ Add a `nugent_category` column with `case_when()`:
 Then run `count(arm, nugent_category)`.
 
 ```{r}
-# reach: mutate(nugent_category = case_when(...)) then count(arm, nugent_category)
+table_with_category <- table_02 |> 
+mutate(nugent_category = case_when(
+  nugent_score >= 0 & nugent_score <= 3 ~ 'normal', 
+  nugent_score >= 4 & nugent_score <= 6 ~ 'intermediate', 
+  nugent_score >= 7 & nugent_score <= 10 ~ 'bv')) |> 
+  count(arm, nugent_category)
+  table_with_category$nugent_category
 ```

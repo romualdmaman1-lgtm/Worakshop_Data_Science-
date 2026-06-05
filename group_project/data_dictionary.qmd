@@ -1,0 +1,177 @@
+---
+title: "Data Dictionary — Group A: Yogurt Study"
+format:
+  html:
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(here)
+
+base <- here::here("data", "group_a_yogurt")
+
+sample_ids <- read_csv(file.path(base, "00_sample_ids_yogurt.csv"), show_col_types = FALSE)
+metadata   <- read_csv(file.path(base, "01_participant_metadata_yogurt.csv"), show_col_types = FALSE)
+qpcr       <- read_csv(file.path(base, "02_qpcr_results_yogurt.csv"), show_col_types = FALSE)
+luminex    <- read_csv(file.path(base, "03_luminex_results_yogurt.csv"), show_col_types = FALSE)
+```
+
+## Overview
+
+This dataset comes from a study about **yogurt consumption and the vaginal microbiome**.
+There are `r n_distinct(metadata$pid)` participants, each sampled at two time points (baseline + after antibiotics),
+for a total of `r nrow(sample_ids)` samples. About half ate yogurt; the other half kept their normal diet.
+
+---
+
+## 1. `00_sample_ids_yogurt.csv` (`r nrow(sample_ids)` rows + header | `r ncol(sample_ids)` columns)
+
+**One row =** one sample collected from a participant at one time point.
+
+```{r}
+#| echo: false
+#| results: asis
+
+n_yogurt <- sample_ids |> filter(arm == "yogurt") |> nrow()
+n_control <- sample_ids |> filter(arm == "unchanged_diet") |> nrow()
+n_baseline <- sample_ids |> filter(time_point == "baseline") |> nrow()
+n_after <- sample_ids |> filter(time_point == "after_antibiotic") |> nrow()
+```
+
+| Column      | Description |
+|-------------|---|
+| `pid`       | Participant ID (e.g. `pid_25`). Links to the metadata file. |
+| `time_point`| `baseline` or `after_antibiotic` — when the sample was taken. |
+| `arm`       | Study group: `yogurt` (ate yogurt) or `unchanged_diet` (control). |
+| `sample_id` | Unique sample code (e.g. `UNCH001`, `YOG002`). Links to lab results. |
+
+- `r n_yogurt` yogurt samples, `r n_control` unchanged diet samples
+- `r n_baseline` baseline, `r n_after` after antibiotic
+
+---
+
+## 2. `01_participant_metadata_yogurt.csv` (`r nrow(metadata)` rows + header | `r ncol(metadata)` columns)
+
+**One row =** one participant enrolled in the study.
+
+```{r}
+#| echo: false
+#| results: asis
+
+n_yogurt_meta <- metadata |> filter(arm == "yogurt") |> nrow()
+n_control_meta <- metadata |> filter(arm == "unchanged_diet") |> nrow()
+birth_control_types <- unique(metadata$birth_control)
+edu_levels <- unique(metadata$education)
+bc_str <- str_c(birth_control_types, collapse = ", ")
+edu_str <- str_c(edu_levels, collapse = ", ")
+```
+
+| Column               | Description |
+|----------------------|---|
+| `pid`                | Participant ID. Matches the `pid` in the sample IDs file. |
+| `arm`                | `yogurt` or `unchanged_diet`. `r n_yogurt_meta` yogurt, `r n_control_meta` control. |
+| `days_since_last_sex`| Days since last sexual encounter (whole number). |
+| `birth_control`      | Type of birth control (e.g. `r bc_str`). |
+| `age`                | Age in years. Range: `r min(metadata$age)`–`r max(metadata$age)`. |
+| `education`          | Education level (e.g. `r edu_str`). |
+| `sex`                | All participants are `female`. |
+
+---
+
+## 3. `02_qpcr_results_yogurt.csv` (`r nrow(qpcr)` rows + header | `r ncol(qpcr)` columns)
+
+**One row =** qPCR results from one sample (measures bacterial DNA).
+
+| Column            | Description |
+|-------------------|---|
+| `sample_id`       | Which sample this came from. Links to the sample IDs file. |
+| `qpcr_bacteria`   | Total bacterial DNA (copy count — large numbers). |
+| `qpcr_crispatus`  | DNA of *Lactobacillus crispatus* (good bacteria, linked to vaginal health). 0 = not detected. |
+| `qpcr_iners`      | DNA of *Lactobacillus iners* (a less protective *Lactobacillus* species). |
+
+```{r}
+#| echo: false
+prop_crispatus_detected <- qpcr |> filter(qpcr_crispatus > 0) |> nrow() / nrow(qpcr) * 100
+prop_iners_detected <- qpcr |> filter(qpcr_iners > 0) |> nrow() / nrow(qpcr) * 100
+```
+
+- *L. crispatus* detected in `r round(prop_crispatus_detected, 0)`% of samples
+- *L. iners* detected in `r round(prop_iners_detected, 0)`% of samples
+
+---
+
+## 4. `03_luminex_results_yogurt.csv` (`r nrow(luminex)` rows + header | `r ncol(luminex)` columns)
+
+**One row =** one cytokine measurement from one sample (long format).
+
+```{r}
+#| echo: false
+#| results: asis
+
+cytokines_list <- unique(luminex$cytokine)
+limits_options <- unique(luminex$limits)
+cyto_str <- str_c(cytokines_list, collapse = ", ")
+limits_in <- limits_options[1]
+limits_out <- limits_options[2]
+```
+
+| Column      | Description |
+|-------------|---|
+| `sample_id` | Which sample. Links to the sample IDs file. |
+| `cytokine`  | The immune signaling molecule measured. `r length(cytokines_list)` types: `r cyto_str`. |
+| `conc`      | Concentration of that cytokine (in the Luminex assay units). |
+| `limits`    | `r limits_in` (reliable) or `r limits_out` (couldn't measure accurately). |
+
+(`r nrow(sample_ids)` samples × `r length(cytokines_list)` cytokines = `r nrow(luminex)` rows.)
+
+---
+
+## How the four files connect
+
+```
+01_participant_metadata (`r nrow(metadata)` participants)
+      │ pid matches
+      ▼
+00_sample_ids (`r nrow(sample_ids)` samples)
+      │ sample_id matches
+      ▼
+   ├── 02_qpcr_results (`r nrow(qpcr)` rows — 1 per sample)
+   └── 03_luminex_results (`r nrow(luminex)` rows — `r length(cytokines_list)` per sample)
+```
+
+---
+
+## Cross-file integrity check
+
+```{r}
+#| echo: false
+
+missing_qpcr <- anti_join(qpcr, sample_ids, by = "sample_id")
+missing_lum  <- anti_join(luminex, sample_ids, by = "sample_id")
+pids_in_samples <- distinct(sample_ids, pid)
+missing_meta <- anti_join(pids_in_samples, metadata, by = "pid")
+
+all_good <- nrow(missing_qpcr) == 0 && nrow(missing_lum) == 0 && nrow(missing_meta) == 0
+```
+
+```{r}
+#| echo: false
+
+if (all_good) {
+  cat("✅ **All checks passed:**  \n")
+  cat("- Every `sample_id` in the lab results links back to the sample IDs file.  \n")
+  cat("- Every `pid` in the samples links back to the participant metadata.  \n")
+  cat("- **No missing values** in any file.  \n")
+} else {
+  cat("❌ **Issues found:**  \n")
+  if (nrow(missing_qpcr) > 0) cat("- qPCR orphan sample_ids:", nrow(missing_qpcr), "\n")
+  if (nrow(missing_lum) > 0)  cat("- Luminex orphan sample_ids:", nrow(missing_lum), "\n")
+  if (nrow(missing_meta) > 0) cat("- PIDs not in metadata:", nrow(missing_meta), "\n")
+}
+```
+
+---
+
+*Generated on `r Sys.Date()` — re-render this document to refresh all numbers.*

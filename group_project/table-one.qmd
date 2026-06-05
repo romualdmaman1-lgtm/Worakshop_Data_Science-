@@ -1,0 +1,105 @@
+---
+title: "Table 1 — Yogurt Study Participant Characteristics"
+format: html
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gtsummary)
+```
+
+```{r}
+# Load participant metadata
+metadata <- read_csv("../data/group_a_yogurt/01_participant_metadata_yogurt.csv")
+```
+
+## Variable-by-variable decisions
+
+### `age`
+- **Default summary:** median (IQR) — keeps the default. Age ranges from 24–37
+  and is roughly symmetric, so median (IQR) is perfectly reasonable.
+- **Default test:** Wilcoxon rank-sum test — **override to `t.test`**. Age is roughly
+  normally distributed (bell-shaped), so a t-test is slightly more powerful here.
+  Both tests will agree, but t-test matches the mean if we wanted that.
+
+### `days_since_last_sex`
+- **Default summary:** median (IQR) — **keep default**. This variable is heavily
+  right-skewed (most values 1–14, outliers up to 48). Median (IQR) is the right
+  choice for skewed data.
+- **Default test:** Wilcoxon rank-sum test — **keep default**. Wilcoxon is
+  non‑parametric and doesn't assume normality, which is ideal for skewed data.
+
+### `birth_control`
+- **Default summary:** n (%) — **keep default**. Two categories (Depoprovera vs
+  no hormonal birth control), nicely balanced (25 vs 26).
+- **Default test:** Chi-squared test — **keep default**. All expected counts are
+  well above 5, so chi-squared is fine.
+
+### `education`
+- **Default summary:** n (%) — **keep default**. Four ordered categories, but in a
+  standard Table 1 they're usually presented as counts with percentages.
+- **Default test:** Chi-squared test — **override to `fisher.test`**. One of the
+  categories (e.g., `less than grade 9`) has only 9 people total, so some cells
+  may have small expected counts. Fisher's exact test is more reliable in that
+  situation.
+
+### `pid` (participant ID)
+- **Exclude** from the table — it's an identifier, not a characteristic.
+
+### `sex`
+- **Exclude** — all 51 participants are female. A constant column adds no
+  information and can't be tested.
+
+---
+
+## Build the Table 1
+
+```{r}
+table_one <- metadata |>
+  select(-pid, -sex) |>                  # drop identifier and constant column
+  tbl_summary(
+    by = arm,                             # compare yogurt vs unchanged_diet
+    statistic = list(
+      all_continuous() ~ "{median} ({p25}, {p75})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = list(
+      all_continuous() ~ 1,
+      all_categorical() ~ c(0, 1)
+    ),
+    label = list(
+      days_since_last_sex ~ "Days since last sex",
+      birth_control ~ "Birth control method"
+    ),
+    missing_text = "Missing"
+  ) |>
+  add_p(
+    test = list(
+      all_continuous() ~ "wilcox.test",
+      age ~ "t.test",                      # override: use t-test for age
+      education ~ "fisher.test"            # override: use Fisher's for education
+    ),
+    pvalue_fun = ~ style_pvalue(.x, digits = 2)
+  ) |>
+  add_overall() |>                         # add an "Overall" column
+  bold_labels() |>
+  modify_header(label = "**Characteristic**")
+
+table_one
+```
+
+> **Note on the test overrides:** The `all_continuous() ~ "wilcox.test"` sets
+> the baseline for all continuous variables, and then the specific overrides
+> (`age ~ "t.test"`) take precedence for that variable.
+
+---
+
+## What the table tells us
+
+```{r}
+# Optional: print with p-values highlighted
+table_one |>
+  modify_footnote(
+    all_stat_cols() ~ "Median (IQR); n (%)"
+  )
+```

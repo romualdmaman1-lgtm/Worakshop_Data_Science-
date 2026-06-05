@@ -1,0 +1,249 @@
+---
+title: "What questions can this dataset answer?"
+format:
+  html:
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(ggpubr)
+library(here)
+
+sample_ids <- read_csv(here("data", "group_a_yogurt", "00_sample_ids_yogurt.csv"),
+                       show_col_types = FALSE)
+metadata   <- read_csv(here("data", "group_a_yogurt", "01_participant_metadata_yogurt.csv"),
+                       show_col_types = FALSE)
+qpcr       <- read_csv(here("data", "group_a_yogurt", "02_qpcr_results_yogurt.csv"),
+                       show_col_types = FALSE)
+luminex    <- read_csv(here("data", "group_a_yogurt", "03_luminex_results_yogurt.csv"),
+                       show_col_types = FALSE)
+
+# Build the joined dataset we'll use throughout
+full_data <- sample_ids |>
+  left_join(metadata, by = c("pid", "arm")) |>
+  left_join(qpcr, by = "sample_id") |>
+  left_join(luminex, by = "sample_id")
+```
+
+# Research Questions You Can Answer
+
+This dataset has **three dimensions** you can play with — pick two and
+compare:
+
+```
+                Study arm
+           (yogurt vs diet)
+                 │
+     Time ───────┼─────── Cytokines / qPCR
+  (baseline vs         (10 immune markers,
+   after abx)          3 bacterial measures)
+                 │
+        Participant traits
+      (age, birth control, etc.)
+```
+
+---
+
+## Question Type 1: "Does yogurt change things?" ← the main study question
+
+Compare yogurt vs unchanged diet on any outcome.
+
+```{r}
+#| echo: false
+#| results: asis
+cat("**Examples:**\n")
+cat("- Does yogurt change total bacterial levels?\n")
+cat("- Do yogurt eaters have more *L. crispatus* (the \"good\" bacteria)?\n")
+cat("- Are cytokine levels different between groups?\n")
+cat("- Does birth control type differ between arms? (potential confounder)\n")
+```
+
+```{r}
+#| fig.width: 6
+#| fig.height: 4
+#| message: false
+
+qpcr |>
+  left_join(select(sample_ids, sample_id, arm), by = "sample_id") |>
+  ggboxplot(x = "arm", y = "qpcr_crispatus", color = "arm",
+            palette = c("#E69F00", "#0072B2"), add = "jitter") +
+  stat_compare_means(method = "wilcox.test") +
+  labs(title = "Q1: Does yogurt affect L. crispatus levels?",
+       x = "Study Arm", y = "L. crispatus DNA")
+```
+
+**Analysis tool:** `tbl_summary(by = arm)` + `add_p()` for the Table 1,
+then `ggboxplot()` + `stat_compare_means()` for each outcome.
+
+---
+
+## Question Type 2: "Does time matter?" (before vs after antibiotics)
+
+Every participant was sampled at **baseline** and again **after antibiotics**.
+You can ask if things change over time, regardless of yogurt.
+
+```{r}
+#| echo: false
+#| results: asis
+cat("**Examples:**\n")
+cat("- Do total bacteria go down after antibiotics?\n")
+cat("- Does *L. crispatus* drop after antibiotics? Does it recover more in yogurt eaters?\n")
+cat("- Do inflammatory cytokines change from baseline to after antibiotics?\n")
+```
+
+```{r}
+#| fig.width: 6
+#| fig.height: 4
+#| message: false
+
+qpcr |>
+  left_join(select(sample_ids, sample_id, time_point), by = "sample_id") |>
+  ggboxplot(x = "time_point", y = "qpcr_bacteria", color = "time_point",
+            palette = c("#009E73", "#CC79A7"), add = "jitter") +
+  stat_compare_means(method = "wilcox.test") +
+  labs(title = "Q2: Do total bacteria change after antibiotics?",
+       x = "Time Point", y = "Total bacterial DNA")
+```
+
+**Analysis tool:** `ggboxplot(x = "time_point", y = "outcome")` +
+`stat_compare_means(method = "wilcox.test", paired = TRUE)` — they're
+paired samples (same person, two time points), so `paired = TRUE` gives
+more power.
+
+---
+
+## Question Type 3: "Does yogurt help *after antibiotics*?" (interaction)
+
+The most interesting question: **does the yogurt effect differ by time point?**
+Maybe yogurt doesn't matter at baseline, but it helps *L. crispatus* recover
+after antibiotics. This is the **interaction** question.
+
+```{r}
+#| echo: false
+#| results: asis
+cat("**Examples:**\n")
+cat("- Is the yogurt effect on *L. crispatus* stronger after antibiotics?\n")
+cat("- Do cytokines in yogurt eaters return to baseline faster?\n")
+cat("- Is there a time × arm interaction for total bacteria?\n")
+```
+
+```{r}
+#| fig.width: 7
+#| fig.height: 4
+#| message: false
+
+qpcr |>
+  left_join(select(sample_ids, sample_id, arm, time_point), by = "sample_id") |>
+  ggboxplot(x = "time_point", y = "qpcr_crispatus", color = "arm",
+            palette = c("#E69F00", "#0072B2"), add = "jitter") +
+  stat_compare_means(aes(group = arm), method = "wilcox.test",
+                     label = "p.format") +
+  labs(title = "Q3: Does yogurt help L. crispatus after antibiotics?",
+       subtitle = "Comparing yogurt vs diet at each time point",
+       x = "Time Point", y = "L. crispatus DNA")
+```
+
+**Analysis tool:** Two approaches — (a) split by time point and compare
+arms separately with `stat_compare_means()`, or (b) run a two-way model:
+`lm(qpcr_crispatus ~ arm * time_point)` and look at the interaction term.
+
+---
+
+## Question Type 4: "Do participant traits matter?" (by age, birth control, etc.)
+
+Use the metadata to stratify or adjust.
+
+```{r}
+#| echo: false
+#| results: asis
+cat("**Examples:**\n")
+cat("- Does birth control type affect *L. crispatus* levels?\n")
+cat("- Are older participants different from younger ones?\n")
+cat("- Is days_since_last_sex associated with any cytokine?\n")
+cat("- After controlling for birth control, does yogurt still show an effect?\n")
+```
+
+```{r}
+#| fig.width: 6
+#| fig.height: 4
+#| message: false
+
+qpcr |>
+  left_join(select(sample_ids, sample_id, pid), by = "sample_id") |>
+  left_join(select(metadata, pid, birth_control), by = "pid") |>
+  ggboxplot(x = "birth_control", y = "qpcr_bacteria", color = "birth_control",
+            palette = c("#D55E00", "#56B4E9"), add = "jitter") +
+  stat_compare_means(method = "wilcox.test") +
+  labs(title = "Q4: Does birth control affect total bacteria?",
+       x = "Birth Control", y = "Total bacterial DNA")
+```
+
+**Analysis tool:** Same `ggboxplot()` pattern but swap the x-axis for a
+participant trait. Or use `tbl_summary(by = birth_control)` to describe.
+
+---
+
+## Question Type 5: "Are bacteria and immune markers connected?" (correlation)
+
+This is a **correlation** question — do *L. crispatus* levels go with higher
+or lower cytokine concentrations?
+
+```{r}
+#| echo: false
+#| results: asis
+cat("**Examples:**\n")
+cat("- Do people with more *L. crispatus* have lower IL-8 (inflammation)?\n")
+cat("- Is *L. iners* associated with higher cytokine levels?\n")
+cat("- Which cytokines correlate most strongly with bacterial levels?\n")
+```
+
+```{r}
+#| fig.width: 6
+#| fig.height: 5
+#| message: false
+
+# Pick one cytokine to show
+qpcr |>
+  left_join(select(sample_ids, sample_id, pid), by = "sample_id") |>
+  left_join(
+    luminex |> filter(cytokine == "IL-8") |> select(sample_id, conc),
+    by = "sample_id"
+  ) |>
+  ggplot(aes(x = qpcr_crispatus, y = conc)) +
+  geom_point(aes(color = qpcr_crispatus > 0), alpha = 0.6, size = 2.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "grey40", linetype = "dashed") +
+  stat_cor(method = "spearman", label.x.npc = "right", label.y.npc = "top") +
+  scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "#0072B2")) +
+  labs(title = "Q5: Is L. crispatus linked to IL-8?",
+       x = "L. crispatus DNA", y = "IL-8 concentration",
+       color = "Detected?") +
+  theme(legend.position = "bottom")
+```
+
+**Analysis tool:** `ggplot(aes(x = bacteria, y = cytokine))` + `geom_point()`
++ `geom_smooth(method = "lm")` + `stat_cor()`. Spearman correlation handles
+the zeros and skew better than Pearson here.
+
+---
+
+## Quick reference: which method for which question
+
+| You want to... | Use this | Code pattern |
+|---|---|---|
+| Compare 2 groups on 1 outcome | Wilcoxon or t-test | `ggboxplot(x = "arm", y = "outcome") + stat_compare_means()` |
+| Compare before vs after (paired) | Paired Wilcoxon | `stat_compare_means(paired = TRUE)` |
+| Compare across time × group | Two-way interaction | `lm(y ~ arm * time_point)` or facet |
+| Screen many outcomes at once | Faceted boxplots | `facet_wrap(~ outcome, scales = "free_y")` |
+| Describe participant traits | Table 1 | `tbl_summary(by = arm)` |
+| Find correlations between measures | Scatter + correlation test | `ggplot + geom_point + stat_cor(method = "spearman")` |
+| Check if a confounder matters | Stratify or add covariate | Split by birth control, or use `lm(y ~ arm + bc)` |
+
+---
+
+```{r}
+#| echo: false
+cat("**Bottom line:** this dataset can answer about 15-20 meaningful questions\n",
+    "across these 5 categories. Pick the one that interests you most and run with it.\n")
+```

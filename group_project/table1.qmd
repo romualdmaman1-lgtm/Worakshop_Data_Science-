@@ -1,0 +1,179 @@
+---
+title: "Table 1 — Participant Characteristics by Study Arm"
+format:
+  html:
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(gtsummary)
+library(here)
+
+meta <- read_csv(here("data", "group_a_yogurt", "01_participant_metadata_yogurt.csv"),
+                 show_col_types = FALSE)
+```
+
+## Variable-by-variable decisions
+
+Let's walk through each variable and decide:
+
+1. **summary type** — median (IQR) for skewed numeric, mean (SD) for normal numeric, n (%) for categorical
+2. **statistical test** — t-test (normal), Wilcoxon (non-normal), chi-squared (categorical)
+3. **normality check** — Shapiro-Wilk for continuous variables
+
+---
+
+### 1. `age` — normally distributed → mean (SD) + t-test
+
+```{r}
+#| echo: false
+shapiro_age <- shapiro.test(meta$age)
+```
+
+| Property | Value |
+|----------|-------|
+| Type | Continuous (numeric) |
+| Normality (Shapiro-Wilk) | W = `r round(shapiro_age$statistic, 4)`, p = `r round(shapiro_age$p.value, 4)` |
+| Normal? | ✅ Yes (p ≥ 0.05) |
+| **Default summary** | median (IQR) |
+| **Override to** | **mean (SD)** — because data is symmetric |
+| **Default test** | Wilcoxon rank-sum |
+| **Override to** | **t-test** — because normality assumption is met |
+
+Why: A normal distribution means the mean is a good center-point, and the t-test has more power (better at detecting real differences) than Wilcoxon when assumptions hold.
+
+---
+
+### 2. `days_since_last_sex` — skewed → median (IQR) + Wilcoxon
+
+```{r}
+#| echo: false
+shapiro_days <- shapiro.test(meta$days_since_last_sex)
+```
+
+| Property | Value |
+|----------|-------|
+| Type | Continuous (count-like) |
+| Normality (Shapiro-Wilk) | W = `r round(shapiro_days$statistic, 4)`, p = `r round(shapiro_days$p.value, 4)` |
+| Normal? | ❌ No (p < 0.05) |
+| **Default summary** | median (IQR) |
+| **Override?** | **None needed** — median(IQR) is correct for skewed data |
+| **Default test** | Wilcoxon rank-sum |
+| **Override?** | **None needed** — Wilcoxon is correct for non-normal data |
+
+Why: Days since last sex is right-skewed (a few participants have much higher values). The median resists the pull of those outliers.
+
+---
+
+### 3. `birth_control` — categorical → n (%) + chi-squared
+
+```{r}
+#| echo: false
+bc_table <- table(meta$birth_control, meta$arm)
+bc_chisq <- chisq.test(bc_table)
+```
+
+| Property | Value |
+|----------|-------|
+| Type | Categorical (2 levels) |
+| **Default summary** | n (%) |
+| **Override?** | **None needed** |
+| **Default test** | chi-squared |
+| **Override?** | **None needed** |
+
+```{r}
+#| echo: false
+# Quick check: are any expected cell counts < 5? If so, Fisher's would be safer.
+any_expected_small <- any(bc_chisq$expected < 5)
+```
+
+- Smallest expected count: `r round(min(bc_chisq$expected), 2)` — `r ifelse(any_expected_small, "❌ below 5 — would need Fisher's exact", "✅ above 5 — chi-squared is fine")`
+
+---
+
+### 4. `education` — categorical (4 levels) → n (%) + chi-squared
+
+```{r}
+#| echo: false
+edu_table <- table(meta$education, meta$arm)
+edu_chisq <- chisq.test(edu_table)
+```
+
+| Property | Value |
+|----------|-------|
+| Type | Categorical (4 levels) |
+| **Default summary** | n (%) |
+| **Override?** | **None needed** |
+| **Default test** | chi-squared |
+| **Override?** | **None needed** |
+
+```{r}
+#| echo: false
+any_expected_small_edu <- any(edu_chisq$expected < 5)
+```
+
+- Smallest expected count: `r round(min(edu_chisq$expected), 2)` — `r ifelse(any_expected_small_edu, "⚠️ some cells < 5 — chi-squared p-value may be unreliable; Fisher's simulate.p.value=TRUE could be used", "✅ above 5 — chi-squared is fine")`
+
+---
+
+### 5. `sex` — constant → **exclude from table**
+
+All 51 participants are `female`. A variable with zero variation adds no information and causes `add_p()` to error. We'll drop it.
+
+---
+
+## The actual Table 1
+
+Now we build the table, applying the overrides decided above.
+
+```{r}
+#| echo: false
+#| results: asis
+
+t1 <- meta |>
+  select(-pid, -sex) |>                # drop ID column + constant sex
+  tbl_summary(
+    by = arm,                          # group by yogurt vs unchanged_diet
+    statistic = list(
+      age ~ "{mean} ({sd})"            # override: mean (SD) instead of median (IQR)
+    ),
+    digits = list(
+      age ~ c(1, 1),                   # 1 decimal for mean, 1 for SD
+      days_since_last_sex ~ c(1, 1),   # 1 decimal for median, 1 for IQR
+      all_categorical() ~ c(0, 1)      # 0 decimal for n, 1 decimal for %
+    )
+  ) |>
+  add_p(
+    test = list(
+      age ~ "t.test"                   # override: t-test instead of Wilcoxon
+    ),
+    pvalue_fun = ~ style_pvalue(.x, digits = 3)
+  ) |>
+  modify_header(label = "**Characteristic**") |>
+  modify_spanning_header(c("stat_1", "stat_2") ~ "**Study Arm**") |>
+  add_overall() |>                     # add a "Overall" column
+  bold_labels()
+
+t1
+```
+
+---
+
+## Summary of all decisions
+
+| Variable | Summary | Why | Test | Why |
+|----------|---------|-----|------|-----|
+| `age` | **mean (SD)** ← overridden | Normal (Shapiro p = `r round(shapiro_age$p.value, 3)`) | **t-test** ← overridden | Normal data |
+| `days_since_last_sex` | median (IQR) ✓ default | Skewed (Shapiro p < 0.001) | Wilcoxon ✓ default | Non-normal data |
+| `birth_control` | n (%) ✓ default | Categorical | chi-squared ✓ default | Expected counts > 5 |
+| `education` | n (%) ✓ default | Categorical | chi-squared ✓ default | All expected > 5 |
+| `sex` | **Excluded** | Constant (all female) | — | — |
+
+```{r}
+#| echo: false
+cat("\n**Note:** gtsummary by default uses `add_p()` with Wilcoxon for continuous\n",
+    "and chi-squared for categorical. We only overrode `age` to use a t-test\n",
+    "because it passed the normality check. Everything else stayed as default.\n")
+```

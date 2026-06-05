@@ -39,6 +39,7 @@ table_02 |>
 **Plot 1 (above). Answer in plain words:**
 
 1. What is the mark?
+mark is ph and arm
 2. What is the comparison being tested?
 3. What test is on it?
 4. How many rows of data made each mark?

@@ -24,25 +24,46 @@ library(here)
 ## Part 1 — Run a chunk, write a sentence, render
 
 ```{r}
-# your code here
+# 3+5+10
+10 * (5+1)
+2 ** 10
 ```
 
 ## Part 2 — Read the data and look at it
 
 ```{r}
-# your code here
+# 64 / 2 + 2
+64 / (2 + 2)
 ```
 
 ## Part 3 — Pull out columns and summarise them
 
 ```{r}
-# your code here
+table_02 <- read_csv(here("data/instructional_dataset/02_visit_clinical_measurements_UKZN_workshop_2023.csv"))
+
+table_02
+glimpse(table_02)
+table_02$nugent_score
+mean(table_02$crp_blood, na.rm = TRUE)
+crp_mean <- mean(table_02$crp_blood, na.rm = TRUE)
+crp_mean
 ```
 
 ## Part 4 — Build something with Pi
 
 ```{r}
-# your code here
+table_02 %>%
+group_by(arm) %>%
+mean(table_02$nugent_score, na.rm = TRUE)
+table_02 %>%                                                                                          
+     group_by(arm) %>%                                                                                   
+     summarise(                                                                                          
+       mean_nugent = mean(nugent_score, na.rm = TRUE),                                                   
+       mean_crp   = mean(crp_blood, na.rm = TRUE),                                                       
+       mean_ph    = mean(ph, na.rm = TRUE)                                                               
+     )              
+select(-pid, -time_point) %>% tbl_summary(by = arm)                                                                       
+                                   
 ```
 
 ## Capstone — make it your own
