@@ -235,10 +235,9 @@ cor_results |>
                        name = "Spearman ρ") +
   labs(title = "Q3: Bacteria–cytokine correlations (Spearman)",
        subtitle = "Positive = more bacteria → more cytokine | Negative = more bacteria → less cytokine",
-       x = "", y = "") + 
-  theme(axis.title = element_text(face = "bold", size=14)) +
+       x = "", y = "") + theme(axis.title = element_text(face = "bold", size=14)) +
   theme_minimal() + 
-  theme(panel.grid = element_blank())
+  theme(panel.grid = element_blank()) 
 ```
 
 ```{r}
@@ -275,7 +274,7 @@ bacteria_cytokine |>
   filter(cytokine == "IL-8") |>
   ggplot(aes(x = qpcr_crispatus, y = conc)) +
   geom_point(aes(color = qpcr_crispatus > 0), alpha = 0.7, size = 2.5) +
-  geom_smooth(method = "lm", se = FALSE, color = "grey40", linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE, color = "grey40", linetype = "dashed") + theme(axis.title = element_text(face = "bold", size=14)) + theme(axis.text.y = element_text(size = 12)) + theme(axis.title = element_text(face = "bold", size=14)) + theme(axis.text.y = element_text(size = 12)) +
   stat_cor(method = "spearman", label.x.npc = "left", label.y.npc = "top",
            cor.coef.name = "rho") +
   scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "#0072B2"),
@@ -322,7 +321,8 @@ qpcr |>
   stat_compare_means(method = "wilcox.test", label = "p.format") +
   labs(title = "Q4: Bacterial outcomes by birth control type",
        x = "Birth Control", y = "DNA copy count") +
-  theme(legend.position = "none")
+  theme(legend.position = "none") + scale_y_log10(expand = expansion(mult=c(1,1.1))) +
+  theme(legend.position = "none", strip.background=element_blank(), axis.text.x = element_text(angle=45, vjust=1,hjust=1))
 ```
 
 ```{r}
