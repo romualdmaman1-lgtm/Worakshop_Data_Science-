@@ -12,6 +12,7 @@ execute:
 ```{r setup}
 library(tidyverse)
 library(here)
+library(ggpubr)
 
 donnees <- read_tsv(here("data/etude_mere_enfant.csv"), na = c("", "NA", "f"))
 donnees <- donnees %>%
@@ -33,7 +34,9 @@ t.test(`sCD14 [ng/ml]` ~ `HIV STATUS`, data = donnees)
 ggplot(donnees, aes(x = `HIV STATUS`, y = `sCD14 [ng/ml]`, fill = `HIV STATUS`)) +
   geom_boxplot() +
   geom_jitter(alpha = 0.3, width = 0.2) +
+  stat_compare_means(method = "t.test", label.x = 1.3, label = "p.format") +
   labs(title = "Inflammation (sCD14) by HIV Status",
+       subtitle = "p < 0.001",
        x = "HIV Status", y = "sCD14 (ng/ml)") +
   scale_fill_manual(values = c("Negative" = "#2E86AB", "Positive" = "#A23B72")) +
   theme_minimal()
@@ -49,7 +52,9 @@ wilcox.test(`IFABP [pg/ml]` ~ `HIV STATUS`, data = donnees)
 ggplot(donnees, aes(x = `HIV STATUS`, y = `IFABP [pg/ml]`, fill = `HIV STATUS`)) +
   geom_boxplot() +
   geom_jitter(alpha = 0.3, width = 0.2) +
+  stat_compare_means(method = "wilcox.test", label.x = 1.3, label = "p.format") +
   labs(title = "Intestinal permeability (IFABP) by HIV Status",
+       subtitle = "p = 0.006",
        x = "HIV Status", y = "IFABP (pg/ml)") +
   scale_fill_manual(values = c("Negative" = "#2E86AB", "Positive" = "#A23B72")) +
   theme_minimal()
@@ -186,6 +191,15 @@ for (nom in names(virus_ratio)) {
 ```
 
 ```{r q4_viz}
+ratios_long <- donnees %>%
+  pivot_longer(cols = c("ratio CMV", "ratio RSV", "ratio ENTERO", "ratio TT"),
+               names_to = "virus", values_to = "ratio") %>%
+  mutate(virus = recode(virus,
+                        "ratio CMV" = "CMV",
+                        "ratio RSV" = "RSV",
+                        "ratio ENTERO" = "Enterovirus",
+                        "ratio TT" = "TT"))
+
 ggplot(ratios_long %>% filter(!is.na(parite_cat)), 
        aes(x = parite_cat, y = ratio, fill = parite_cat)) +
   geom_boxplot() +

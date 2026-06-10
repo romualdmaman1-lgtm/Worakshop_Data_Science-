@@ -1,4 +1,5 @@
 library(tidyverse)
+library(ggpubr)
 
 donnees <- read_tsv("data/etude_mere_enfant.csv", na = c("", "NA", "f"), show_col_types = FALSE)
 donnees <- donnees %>%
@@ -18,6 +19,7 @@ couleurs <- c("F" = "#E8829A", "M" = "#4E9BBF")
 # Graph 1: sCD14 by HIV
 p1 <- ggplot(donnees, aes(x = `HIV STATUS`, y = `sCD14 [ng/ml]`, fill = `HIV STATUS`)) +
   geom_boxplot() + geom_jitter(alpha = 0.3, width = 0.2) +
+  stat_compare_means(method = "t.test", label.x = 1.3, label = "p.format") +
   labs(title = "Inflammation (sCD14) by HIV Status",
        subtitle = "p < 0.001 - HIV+ associated with higher inflammation",
        x = "HIV Status", y = "sCD14 (ng/ml)") +
@@ -73,10 +75,21 @@ p5 <- ggplot(ratios_long, aes(x = `Birth weigh (tg)`, y = ratio, color = virus))
 ggsave("notebooks/graph5_poids_ratio.png", p5, width = 8, height = 6)
 
 # Graph 6: Ratios by sex, faceted by HIV
+# Compute positions for manual p-value annotations (only significant panels)
+p_annot <- data.frame(
+  virus = c("CMV", "TT"),
+  `HIV STATUS` = c("Negative", "Negative"),
+  y_pos = c(190, 160),
+  label = c("p = 0.013", "p = 0.017"),
+  check.names = FALSE
+)
+
 p6 <- ggplot(ratios_long %>% filter(!is.na(`child SEX`)), 
              aes(x = `child SEX`, y = ratio, fill = `child SEX`)) +
   geom_boxplot() + geom_jitter(alpha = 0.3, width = 0.15) +
   geom_hline(yintercept = 1, linetype = "dashed", color = "red", alpha = 0.5) +
+  geom_text(data = p_annot, aes(x = 1.5, y = y_pos, label = label),
+            inherit.aes = FALSE, size = 3.5) +
   facet_grid(virus ~ `HIV STATUS`, scales = "free_y") + scale_y_log10() +
   scale_fill_manual(values = couleurs) +
   labs(title = "Transfer ratios by child sex and HIV status",
